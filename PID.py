@@ -11,7 +11,7 @@ class PIDControl(BaseClock):
 	"""
 	
 	def __init__(self, k_rot, k_trans, gyro, motor_pins):
-		super(PIDControl, self).__init__(tick_hz=6)
+		super(PIDControl, self).__init__(tick_hz=8000)
 		
 		PWM.setup()
 		
