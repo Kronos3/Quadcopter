@@ -1,5 +1,6 @@
 import sched, time
 
+
 class BaseClock:
 	tick_hz = -1
 	dt = 0
@@ -11,10 +12,11 @@ class BaseClock:
 		self.scheduler = sched.scheduler(time.time, time.sleep)
 		self.dt = 0
 		self.period = 1.0 / self.tick_hz
+		self.old_time = time.time()
 		
 		self.register()
 	
-	def tick(self):
+	def tick(self, dt):
 		pass
 	
 	def start(self):
