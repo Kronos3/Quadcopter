@@ -5,6 +5,7 @@ import RPIO.PWM as PWM
 PID_mode = namedtuple("PID_mode", "pitch roll yaw")
 PID_scale = namedtuple("PID_scale", "pitch_c roll_c yaw_c")
 
+
 class PIDControl(BaseClock):
 	"""
 	Proportional Integral Derivative Control
@@ -17,9 +18,9 @@ class PIDControl(BaseClock):
 		
 		self.gyro = gyro
 		self.modes = {
-			"stabilize": PID_mode(0,0,0),
-			"ascend": PID_mode(0,0,0),
-			"decend": PID_mode(0,0,0)
+			"stabilize": PID_mode(0, 0, 0),
+			"ascend": PID_mode(0, 0, 0),
+			"descend": PID_mode(0, 0, 0)
 		}
 		
 		self.current_mode = self.modes["stabilize"]
@@ -40,10 +41,10 @@ class PIDControl(BaseClock):
 		self.throttle = 0
 		self.desired_height = -1
 		
-		self.motor_1 = Motor(motor_pins[0], PID_scale(1,1,-1))
-		self.motor_2 = Motor(motor_pins[1], PID_scale(1,-1,1))
-		self.motor_3 = Motor(motor_pins[2], PID_scale(-1,-1,-1))
-		self.motor_4 = Motor(motor_pins[4], PID_scale(-1,1,1))
+		self.motor_1 = Motor(motor_pins[0], PID_scale(1, 1, -1))
+		self.motor_2 = Motor(motor_pins[1], PID_scale(1, -1, 1))
+		self.motor_3 = Motor(motor_pins[2], PID_scale(-1, -1, -1))
+		self.motor_4 = Motor(motor_pins[4], PID_scale(-1, 1, 1))
 	
 	def set_mode(self, mode):
 		self.current_mode = self.modes[mode]
@@ -66,7 +67,6 @@ class PIDControl(BaseClock):
 		self.euler_velY += gyro[1] * dt
 		self.euler_velZ += gyro[2] * dt
 		
-		
 		if self.desired_height != -1:
 			self.throttle = self.pid_lift.get(dt, self.eulerZ, self.desired_height)
 		
@@ -74,6 +74,7 @@ class PIDControl(BaseClock):
 		self.motor_2.tick(self.throttle, pid_pitch, pid_roll, pid_yaw)
 		self.motor_3.tick(self.throttle, pid_pitch, pid_roll, pid_yaw)
 		self.motor_4.tick(self.throttle, pid_pitch, pid_roll, pid_yaw)
+
 
 class PID:
 	def __init__(self, Kp, Ki, Kd):
