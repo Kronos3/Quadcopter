@@ -1,6 +1,6 @@
 from collections import namedtuple
 from clock import BaseClock
-import RPIO.PWM as PWM
+import RPi.GPIO as GPIO
 
 PID_mode = namedtuple("PID_mode", "pitch roll yaw")
 PID_scale = namedtuple("PID_scale", "pitch_c roll_c yaw_c")
@@ -12,8 +12,6 @@ class PIDControl(BaseClock):
 	"""
 	
 	def __init__(self, k_rot, k_trans, gyro, motor_pins):
-		super(PIDControl, self).__init__(tick_hz=8000)
-		
 		PWM.setup()
 		
 		self.gyro = gyro
@@ -25,12 +23,7 @@ class PIDControl(BaseClock):
 		
 		self.current_mode = self.modes["stabilize"]
 		
-		self.eulerX = 0
-		self.eulerY = 0
 		self.eulerZ = 0
-		
-		self.euler_velX = 0
-		self.euler_velY = 0
 		self.euler_velZ = 0
 		
 		self.pid_pitch = PID(*k_rot)
@@ -49,23 +42,16 @@ class PIDControl(BaseClock):
 	def set_mode(self, mode):
 		self.current_mode = self.modes[mode]
 	
-	def read(self):
-		return self.gyro.get_gyro_data(), self.gyro.get_accel_data()
-	
 	def tick(self, dt):
-		gyro, accel = self.read()
+		gyro = self.gyro.get_gyro_data()
+		z_accel = self.gyro.get_z_accel()
 		
 		pid_pitch = self.pid_pitch.get(dt, gyro[0], self.current_mode.pitch)
 		pid_roll = self.pid_roll.get(dt, gyro[1], self.current_mode.roll)
-		pid_yaw = self.pid_yaw.get(dt, gyro[3], self.current_mode.yaw)
+		pid_yaw = self.pid_yaw.get(dt, gyro[2], self.current_mode.yaw)
 		
-		self.eulerX += self.euler_velX * dt
-		self.eulerY += self.euler_velY * dt
 		self.eulerZ += self.euler_velZ * dt
-		
-		self.euler_velX += gyro[0] * dt
-		self.euler_velY += gyro[1] * dt
-		self.euler_velZ += gyro[2] * dt
+		self.euler_velZ += z_accel * dt
 		
 		if self.desired_height != -1:
 			self.throttle = self.pid_lift.get(dt, self.eulerZ, self.desired_height)
@@ -103,12 +89,7 @@ class Motor:
 	current_speed = -1
 	current_throttle = -1
 	
-	servo = None
-	
-	DUTY_MIN = 35
-	DUTY_MAX = 100
-	
-	SUBCYCLE_INC = 20000
+	pwm = None
 	
 	# PID related PIV
 	mode_scale = None
@@ -117,26 +98,21 @@ class Motor:
 		self.pwm_pin = pwm_pin
 		self.current_speed = 0
 		
-		self.servo = PWM.Servo()
+		GPIO.setup(pwm_pin, GPIO.OUT)
+		
+		self.pwm = GPIO.PWM(pwm_pin, 8000)
 		self.mode_scale = mode_scale
 		self.current_throttle = 0
+		
+		self.pwm.start(0)
 	
 	def stop(self):
-		self.__set_speed(0)
+		self.set_speed(0)
+		self.pwm.stop()
 	
-	@staticmethod
-	def scale(percent):
-		"""
-		_range = Motor.DUTY_MAX - Motor.DUTY_MIN
-		scaled_percent = _range * (percent / 100.0) + Motor.DUTY_MIN
-		return scaled_percent * Motor.SUBCYCLE_INC
-		"""
-		
-		return Motor.SUBCYCLE_INC * (((Motor.DUTY_MAX - Motor.DUTY_MIN) * (percent / 100.0)) + Motor.DUTY_MIN)
-	
-	def __set_speed(self, percent):
+	def set_speed(self, percent):
 		self.current_speed = percent
-		self.servo.set_servo(self.pwm_pin, Motor.scale(self.current_speed))
+		self.pwm.ChangeDutyCycle(percent)
 	
 	def set_throttle(self, percent):
 		self.current_throttle = percent
@@ -148,4 +124,4 @@ class Motor:
 		
 		self.current_throttle = throttle
 		speed = self.current_throttle + roll_offset + pitch_offset + yaw_offset
-		self.__set_speed(speed)
+		self.set_speed(speed)

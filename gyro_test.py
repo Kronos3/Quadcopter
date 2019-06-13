@@ -1,9 +1,8 @@
 from gyro import Gyro
 import sys
 import time
+from clock import BaseClock
 
-test = Gyro(0x68)
-test.set_accel_range(Gyro.ACCEL_RANGE_8G)
 
 index = int(sys.argv[1])
 

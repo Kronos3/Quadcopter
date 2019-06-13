@@ -58,6 +58,10 @@ class Gyro:
 		self.bus = smbus.SMBus(bus)
 		# Wake up the MPU-6050 since it starts in sleep mode
 		self.bus.write_byte_data(self.address, self.PWR_MGMT_1, 0x00)
+		
+		# Zero this out
+		self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, 0x00)
+		self.accel_range = 0x00
 	
 	# I2C communication methods
 	def read_i2c_word(self, register):
@@ -100,6 +104,8 @@ class Gyro:
 		# First change it to 0x00 to make sure we write the correct value later
 		self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, 0x00)
 		
+		self.accel_range = accel_range
+		
 		# Write the new range to the ACCEL_CONFIG register
 		self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, accel_range)
 	
@@ -111,6 +117,8 @@ class Gyro:
 		returns -1 something went wrong.
 		"""
 		raw_data = self.bus.read_byte_data(self.address, self.ACCEL_CONFIG)
+		
+		self.accel_range = raw_data
 		
 		if raw is True:
 			return raw_data
@@ -126,6 +134,26 @@ class Gyro:
 			else:
 				return -1
 	
+	def get_z_accel(self):
+		z = self.read_i2c_word(self.ACCEL_ZOUT0)
+		
+		if self.accel_range == self.ACCEL_RANGE_2G:
+			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
+		elif self.accel_range == self.ACCEL_RANGE_4G:
+			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_4G
+		elif self.accel_range == self.ACCEL_RANGE_8G:
+			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_8G
+		elif self.accel_range == self.ACCEL_RANGE_16G:
+			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_16G
+		else:
+			print("Unkown range - accel_scale_modifier set to self.ACCEL_SCALE_MODIFIER_2G")
+			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
+		
+		z /= accel_scale_modifier
+		z *= self.GRAVITIY_MS2
+		
+		return z
+	
 	def get_accel_data(self, g=False):
 		"""Gets and returns the X, Y and Z values from the accelerometer.
 
@@ -138,15 +166,13 @@ class Gyro:
 		z = self.read_i2c_word(self.ACCEL_ZOUT0)
 		
 		accel_scale_modifier = None
-		accel_range = self.read_accel_range(True)
-		
-		if accel_range == self.ACCEL_RANGE_2G:
+		if self.accel_range == self.ACCEL_RANGE_2G:
 			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
-		elif accel_range == self.ACCEL_RANGE_4G:
+		elif self.accel_range == self.ACCEL_RANGE_4G:
 			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_4G
-		elif accel_range == self.ACCEL_RANGE_8G:
+		elif self.accel_range == self.ACCEL_RANGE_8G:
 			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_8G
-		elif accel_range == self.ACCEL_RANGE_16G:
+		elif self.accel_range == self.ACCEL_RANGE_16G:
 			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_16G
 		else:
 			print("Unkown range - accel_scale_modifier set to self.ACCEL_SCALE_MODIFIER_2G")
@@ -156,7 +182,7 @@ class Gyro:
 		y = y / accel_scale_modifier
 		z = z / accel_scale_modifier
 		
-		if not g is True:
+		if g is False:
 			x, y, z = (i * self.GRAVITIY_MS2 for i in (x,y,z))
 		
 		return x, y, z
