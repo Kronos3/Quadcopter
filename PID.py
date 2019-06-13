@@ -100,7 +100,7 @@ class Motor:
 		
 		GPIO.setup(pwm_pin, GPIO.OUT)
 		
-		self.pwm = GPIO.PWM(pwm_pin, 8000)
+		self.pwm = GPIO.PWM(pwm_pin, 800)
 		self.mode_scale = mode_scale
 		self.current_throttle = 0
 		
