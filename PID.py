@@ -43,15 +43,18 @@ class PIDControl(BaseClock):
 		self.current_mode = self.modes[mode]
 	
 	def tick(self, dt):
-		gyro = self.gyro.get_gyro_data()
 		z_accel = self.gyro.get_z_accel()
+		
+		self.eulerZ += self.euler_velZ * dt
+		self.euler_velZ += z_accel * dt
+
+		gyro = self.gyro.get_gyro_data()
 		
 		pid_pitch = self.pid_pitch.get(dt, gyro[0], self.current_mode.pitch)
 		pid_roll = self.pid_roll.get(dt, gyro[1], self.current_mode.roll)
 		pid_yaw = self.pid_yaw.get(dt, gyro[2], self.current_mode.yaw)
 		
 		self.eulerZ += self.euler_velZ * dt
-		self.euler_velZ += z_accel * dt
 		
 		if self.desired_height != -1:
 			self.throttle = self.pid_lift.get(dt, self.eulerZ, self.desired_height)
@@ -71,16 +74,15 @@ class PID:
 		self.Ki = Ki
 		self.Kd = Kd
 	
-	def get(self, dt, sensor, desired):
+	def pid(self, dt, sensor, desired):
 		error = desired - sensor
+		self.integral += error * dt
 		
 		p = self.Kp * error
-		i = self.integral + (error * dt)
-		d = (error - self.prev_error) / dt
+		i = self.Ki * self.integral
+		d = self.Kd * ((error - self.prev_error) / dt)
 		
-		self.integral = i
 		self.prev_error = error
-		
 		return p + i + d
 
 
