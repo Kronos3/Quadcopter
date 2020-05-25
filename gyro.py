@@ -1,8 +1,7 @@
 """This program handles the communication over I2C
 between a Raspberry Pi and a MPU-6050 Gyroscope / Accelerometer combo.
 Made by: MrTijn/Tijndagamer
-Released under the MIT License
-Copyright (c) 2015, 2016, 2017 MrTijn/Tijndagamer
+Edited by: Andrei Tumbar/Kronos3
 """
 
 import smbus
@@ -10,7 +9,7 @@ import smbus
 
 class Gyro:
 	# Global Variables
-	GRAVITIY_MS2 = 9.80665
+	GRAVITY_MS2 = 9.80665
 	address = None
 	bus = None
 	
@@ -52,6 +51,8 @@ class Gyro:
 	
 	ACCEL_CONFIG = 0x1C
 	GYRO_CONFIG = 0x1B
+
+	gyro_range: int
 	
 	def __init__(self, address, bus=1):
 		self.address = address
@@ -62,6 +63,8 @@ class Gyro:
 		# Zero this out
 		self.bus.write_byte_data(self.address, self.ACCEL_CONFIG, 0x00)
 		self.accel_range = 0x00
+
+		self.gyro_range = self.read_gyro_range(True)
 	
 	# I2C communication methods
 	def read_i2c_word(self, register):
@@ -137,6 +140,12 @@ class Gyro:
 	def get_z_accel(self):
 		z = self.read_i2c_word(self.ACCEL_ZOUT0)
 		
+		z /= self.accel_modifier()
+		z *= self.GRAVITY_MS2
+		
+		return z
+
+	def accel_modifier(self):
 		if self.accel_range == self.ACCEL_RANGE_2G:
 			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
 		elif self.accel_range == self.ACCEL_RANGE_4G:
@@ -148,12 +157,24 @@ class Gyro:
 		else:
 			print("Unkown range - accel_scale_modifier set to self.ACCEL_SCALE_MODIFIER_2G")
 			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
-		
-		z /= accel_scale_modifier
-		z *= self.GRAVITIY_MS2
-		
-		return z
-	
+
+		return accel_scale_modifier
+
+	def gyro_modifier(self):
+		if self.gyro_range == self.GYRO_RANGE_250DEG:
+			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_250DEG
+		elif self.gyro_range == self.GYRO_RANGE_500DEG:
+			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_500DEG
+		elif self.gyro_range == self.GYRO_RANGE_1000DEG:
+			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_1000DEG
+		elif self.gyro_range == self.GYRO_RANGE_2000DEG:
+			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_2000DEG
+		else:
+			print("Unkown range - gyro_scale_modifier set to self.GYRO_SCALE_MODIFIER_250DEG")
+			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_250DEG
+
+		return gyro_scale_modifier
+
 	def get_accel_data(self, g=False):
 		"""Gets and returns the X, Y and Z values from the accelerometer.
 
@@ -164,26 +185,15 @@ class Gyro:
 		x = self.read_i2c_word(self.ACCEL_XOUT0)
 		y = self.read_i2c_word(self.ACCEL_YOUT0)
 		z = self.read_i2c_word(self.ACCEL_ZOUT0)
-		
-		accel_scale_modifier = None
-		if self.accel_range == self.ACCEL_RANGE_2G:
-			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
-		elif self.accel_range == self.ACCEL_RANGE_4G:
-			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_4G
-		elif self.accel_range == self.ACCEL_RANGE_8G:
-			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_8G
-		elif self.accel_range == self.ACCEL_RANGE_16G:
-			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_16G
-		else:
-			print("Unkown range - accel_scale_modifier set to self.ACCEL_SCALE_MODIFIER_2G")
-			accel_scale_modifier = self.ACCEL_SCALE_MODIFIER_2G
-		
+
+		accel_scale_modifier = self.accel_modifier()
+
 		x = x / accel_scale_modifier
 		y = y / accel_scale_modifier
 		z = z / accel_scale_modifier
 		
 		if g is False:
-			x, y, z = (i * self.GRAVITIY_MS2 for i in (x,y,z))
+			x, y, z = (i * self.GRAVITY_MS2 for i in (x, y, z))
 		
 		return x, y, z
 	
@@ -230,21 +240,8 @@ class Gyro:
 		x = self.read_i2c_word(self.GYRO_XOUT0)
 		y = self.read_i2c_word(self.GYRO_YOUT0)
 		z = self.read_i2c_word(self.GYRO_ZOUT0)
-		
-		gyro_scale_modifier = None
-		gyro_range = self.read_gyro_range(True)
-		
-		if gyro_range == self.GYRO_RANGE_250DEG:
-			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_250DEG
-		elif gyro_range == self.GYRO_RANGE_500DEG:
-			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_500DEG
-		elif gyro_range == self.GYRO_RANGE_1000DEG:
-			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_1000DEG
-		elif gyro_range == self.GYRO_RANGE_2000DEG:
-			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_2000DEG
-		else:
-			print("Unkown range - gyro_scale_modifier set to self.GYRO_SCALE_MODIFIER_250DEG")
-			gyro_scale_modifier = self.GYRO_SCALE_MODIFIER_250DEG
+
+		gyro_scale_modifier = self.gyro_modifier()
 		
 		x = x / gyro_scale_modifier
 		y = y / gyro_scale_modifier
@@ -253,7 +250,7 @@ class Gyro:
 		return x, y, z
 	
 	def pid_read(self):
-		return (*self.get_gyro_data(), *self.get_accel_data())
+		return *self.get_gyro_data(), *self.get_accel_data()
 	
 	def get_all_data(self):
 		"""Reads and returns all the available data."""
